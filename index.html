@@ -36,6 +36,14 @@
   .acc-body.open{display:block;}
   .grid-row-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
   .chip{border:1.5px solid var(--border);border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;}
+  .matrix-wrap{overflow-x:auto;margin-top:6px;-webkit-overflow-scrolling:touch;}
+  .matrix-table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  .matrix-table th, .matrix-table td{border:1px solid var(--border);padding:9px 10px;text-align:center;}
+  .matrix-table th{background:#fafbfd;font-weight:600;white-space:normal;max-width:110px;}
+  .matrix-table td.row-label, .matrix-table th.row-label{
+    text-align:left;white-space:nowrap;position:sticky;left:0;background:#fff;font-weight:500;z-index:1;}
+  .matrix-table th.row-label{background:#fafbfd;z-index:2;}
+  .matrix-table td.cell-check input{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;}
   .chip.selected{border-color:var(--blue);background:var(--blue);color:#fff;}
   .scale5{display:flex;justify-content:space-between;gap:6px;margin-top:4px;}
   .scale5 .pt{flex:1;text-align:center;border:1.5px solid var(--border);border-radius:8px;padding:10px 4px;cursor:pointer;font-size:12px;}
@@ -80,12 +88,6 @@
 
 // ---- Reusable option lists (verbatim from QNR) --------------------------
 
-const REGIONS = [
-  "APAC & Oceania","Asia","Oceania","Central Asia & CIS","Central Asia","CIS",
-  "EMEA","Africa","Europe","Middle East","Americas","North America",
-  "Central America","South America"
-];
-
 const CHEM_BRANDS_AWARE = [
   "Australian Gold Reagents","Cyanco (Orica)","Cyplus","Cemex","CyPlus-Idesa",
   "Draslovka (Chemours)","Guang'an Chengxin Chemical Co","Hebei Chengxin",
@@ -94,10 +96,14 @@ const CHEM_BRANDS_AWARE = [
   "UPL Ltd","Yingkou Sanzheng"
 ];
 const CHEM_STATEMENTS = ["Innovative","Trustworthy","Quality products","Customer centric","Well priced","Don't know/NA"];
+// NEW per client feedback: chemical suppliers were missing usage questions
+// that the AI software / analyzer sections already had.
+const CHEM_USAGE_STATEMENTS = ["We have purchased from them before","We currently use their products","Had a poor experience"];
 
 const AI_BRANDS_AWARE = [
   "Aveeva","Inellisense.io","Metso Outotec","Mintek","Draslovka / MetOptima",
-  "Manta Controls","Seeq","StoneThree","Orica","Trend Miner","FLS / FLSmidth","Honeywell"
+  "Manta Controls","Seeq","StoneThree","Orica","Trend Miner","FLS / FLSmidth","Honeywell",
+  "Avathon" // added per client feedback (22 Sep 2026)
 ];
 const AI_BRANDS_USAGE = ["Draslovka / MetOptima","Intellisense.io","Manta Controls","Metso Outotec","Seeq","Mintek","Orica","Trend Miner"];
 const AI_USAGE_STATEMENTS = ["We have purchased from them before","We currently use their products","I would recommend this brand","Had a poor experience"];
@@ -117,8 +123,11 @@ const CONTENT_TYPES = [
   "On-demand webinars","Other, please specify:"
 ];
 
-// ---- Q3 role list, tiered (verbatim labels, tier used for QTIER + Q4 skip) ----
-const ROLES = [
+// ---- Q3 role list — reverted to the original flat Word-doc list per client
+// feedback (22 Sep 2026, via Marina/Harbour): the granular 32-role/5-tier
+// breakdown below is kept as an internal recruitment/persona reference only —
+// it is NOT shown to respondents and NOT wired into the live question.
+const ROLES_RECRUITMENT_REFERENCE_ONLY = [
   {group:"Tier 1: Primary Decision Makers & Champions", tier:1, items:[
     "CEO","General Manager (GM)","Mine General Manager (Mine GM)",
     {label:"Chief Metallurgist (Chief Met)", metOK:true},
@@ -148,6 +157,15 @@ const ROLES = [
   ]}
 ];
 
+// ---- Q6 region groups — parent labels are non-selectable headers per
+// client feedback; only the sub-regions are selectable ----
+const REGION_GROUPS = [
+  {group:"APAC & Oceania", items:["Asia","Oceania"]},
+  {group:"Central Asia & CIS", items:["Central Asia","CIS"]},
+  {group:"EMEA", items:["Africa","Europe","Middle East"]},
+  {group:"Americas", items:["North America","Central America","South America"]}
+];
+
 // ---- Q7 commodities (verbatim, V4 list) ----
 const COMMODITIES = [
   {value:"au", label:"Gold (Au)"}, {value:"ag", label:"Silver (Ag)"},
@@ -172,25 +190,37 @@ const CYANIDE_TRIGGER = ["au","ag","cu"]; // Q8 only asked if any of these selec
 // =========================================================================
 const QUESTIONS = [
 
-  { id:"Q1", code:"Q1", type:"single", terminateOnLabel:"Other (terminate)",
+  { id:"Q1", code:"Q1", type:"single",
     prompt:"What is the industry sector that you work in?",
-    options:["Mining & Extraction","Other (terminate)"] },
+    options:["Mining & Extraction","Other"] },
 
   { id:"Q2", code:"Q2", type:"single",
     prompt:"Are you based at the Mine Site, or at a Corporate Head Office?",
     options:["Mine site","Corporate Head Office","Work remotely"] },
 
-  { id:"Q3", code:"Q3", type:"tiered_single",
-    prompt:"What best describes your role?",
-    groups: ROLES, other:true },
+  { id:"Q3", code:"Q3", type:"single", otherText:true,
+    prompt:"What best describes your role? (All qualify)",
+    options:[
+      "AI / Business Intelligence",
+      "Business Development / Strategy",
+      "Executive Management (e.g. C-Level, VP, Director, Head of Department, Executive)",
+      "General Management",
+      "Innovation / Continuous Improvement",
+      "Institutional Advisor / Consultant / Investor",
+      "IT / Cybersecurity",
+      "Metallurgy / Processing",
+      "Procurement / Supply Chain Management",
+      "Plant Management",
+      "Plant Operations / Engineering",
+      "Other: please specify"
+    ] },
 
   { id:"Q4", code:"Q4", type:"single",
     prompt:"Are you involved in technology & vendor selection within the mineral processing plant?",
     options:["Yes – influence technology/vendor selection","Yes – final approval","No"],
     terminateIf:(val,a)=>{
       if(val!=="No") return null;
-      const role = getRoleMeta(a.Q3);
-      if(role && role.metOK) return null; // exception: Metallurgy/Processing roles pass
+      if(a.Q3 === "Metallurgy / Processing") return null; // exception per QNR
       return "Not involved in technology/vendor selection, and role is outside Metallurgy/Processing.";
     }},
 
@@ -207,9 +237,9 @@ const QUESTIONS = [
       return allNotFamiliar ? "Not familiar with any of the three mining areas." : null;
     }},
 
-  { id:"Q6", code:"Q6", type:"single",
+  { id:"Q6", code:"Q6", type:"grouped_single",
     prompt:"In which region are you based?",
-    options: REGIONS },
+    groups: REGION_GROUPS },
 
   { id:"Q7", code:"Q7", type:"multi",
     prompt:"Which metals/minerals does your company mine?",
@@ -257,6 +287,12 @@ const QUESTIONS = [
   { id:"Q13a", code:"Q13a", type:"most_pipe", pipeFrom:"Q13", section:"Chemical Supplier",
     prompt:"Which one sodium cyanide supplier would you most likely recommend?",
     showIf:(a)=> a.Q5 && a.Q5.chem !== "Not Familiar" && (a.Q13||[]).length>0 },
+
+  { id:"Q13b", code:"Q13b", type:"stmt_grid", section:"Chemical Supplier", pipeFrom:"Q13",
+    excludeFromPipe:["Cemex","Other"],
+    prompt:"Please select the statements that apply for these chemical supplier brands.",
+    stmts: CHEM_USAGE_STATEMENTS,
+    showIf:(a)=> a.Q5 && a.Q5.chem !== "Not Familiar" && (a.Q13||[]).filter(x=>x!=="Cemex").length>0 },
 
   { id:"Q14", code:"Q14", type:"stmt_grid", section:"Chemical Supplier", pipeFrom:"Q13",
     excludeFromPipe:["Cemex","Other"],
@@ -318,8 +354,10 @@ const QUESTIONS = [
     prompt:"What topics would you like to hear about in the area of Mineral Processing? Include any topics that interest you, or areas that pose a challenge for your team/s." }
 ];
 
+// Kept only as a lookup against the recruitment/persona reference list above —
+// not called anywhere in the live question flow.
 function getRoleMeta(label){
-  for(const g of ROLES){
+  for(const g of ROLES_RECRUITMENT_REFERENCE_ONLY){
     for(const it of g.items){
       const lbl = typeof it==="string" ? it : it.label;
       if(lbl===label) return typeof it==="string" ? {label:lbl, tier:g.tier} : {...it, tier:g.tier};
@@ -481,7 +519,7 @@ function renderQuestion(q){
   setNextEnabled(false);
 
   if(q.type==='single') renderSingle(q, body);
-  else if(q.type==='tiered_single') renderTieredSingle(q, body);
+  else if(q.type==='grouped_single') renderGroupedSingle(q, body);
   else if(q.type==='multi') renderMulti(q, body);
   else if(q.type==='most_pipe') renderMostPipe(q, body);
   else if(q.type==='rating_grid_single') renderRatingGridSingle(q, body);
@@ -500,36 +538,47 @@ function renderQuestion(q){
 function renderSingle(q, body){
   const opts = q.options;
   const wrap = document.createElement('div'); wrap.className='opts';
+  let otherInput=null;
   opts.forEach(label=>{
     const row = document.createElement('label'); row.className='opt';
     row.innerHTML = `<input type="radio" name="${q.id}" value="${escapeHtml(label)}"><span class="opt-label">${escapeHtml(label)}</span>`;
+    const isOtherOpt = q.otherText && label.startsWith('Other');
     row.querySelector('input').checked = answers[q.id]===label;
     if(answers[q.id]===label) row.classList.add('selected');
     row.onclick = ()=>{
       answers[q.id]=label;
-      [...wrap.children].forEach(c=>c.classList.remove('selected'));
+      [...wrap.querySelectorAll('.opt')].forEach(c=>c.classList.remove('selected'));
       row.classList.add('selected');
-      setNextEnabled(true);
+      if(otherInput) otherInput.style.display = isOtherOpt ? 'block' : 'none';
+      setNextEnabled(isOtherOpt ? !!(otherInput && otherInput.value.trim()) : true);
     };
     wrap.appendChild(row);
+    if(isOtherOpt){
+      otherInput = document.createElement('input');
+      otherInput.className='other-input'; otherInput.placeholder='Insert role';
+      otherInput.style.display = answers[q.id]===label ? 'block':'none';
+      otherInput.value = answers[q.id+'_other']||'';
+      otherInput.oninput = ()=>{ answers[q.id+'_other']=otherInput.value; setNextEnabled(!!otherInput.value.trim()); };
+      wrap.appendChild(otherInput);
+    }
   });
   body.appendChild(wrap);
 }
 
-function renderTieredSingle(q, body){
+// Generic grouped single-select: group labels are non-selectable headers,
+// only the items underneath are selectable. Used for Q6 (regions).
+function renderGroupedSingle(q, body){
   const wrap = document.createElement('div');
   q.groups.forEach(g=>{
     const h = document.createElement('div'); h.className='group-header'; h.textContent = g.group;
     wrap.appendChild(h);
     const opts = document.createElement('div'); opts.className='opts';
-    g.items.forEach(it=>{
-      const label = typeof it==='string' ? it : it.label;
+    g.items.forEach(label=>{
       const row = document.createElement('label'); row.className='opt';
       row.innerHTML = `<input type="radio" name="${q.id}" value="${escapeHtml(label)}"><span class="opt-label">${escapeHtml(label)}</span>`;
       if(answers[q.id]===label){ row.classList.add('selected'); row.querySelector('input').checked=true; }
       row.onclick = ()=>{
         answers[q.id]=label;
-        answers.QTIER = getRoleTier(label);
         [...document.querySelectorAll(`input[name="${q.id}"]`)].forEach(r=>r.closest('.opt').classList.remove('selected'));
         row.classList.add('selected');
         setNextEnabled(true);
@@ -538,23 +587,6 @@ function renderTieredSingle(q, body){
     });
     wrap.appendChild(opts);
   });
-  if(q.other){
-    const h = document.createElement('div'); h.className='group-header'; h.textContent='Other';
-    wrap.appendChild(h);
-    const row = document.createElement('label'); row.className='opt';
-    row.innerHTML = `<input type="radio" name="${q.id}" value="Other"><span class="opt-label">Other: please specify</span>`;
-    const otherInput = document.createElement('input'); otherInput.className='other-input'; otherInput.placeholder='Insert role';
-    otherInput.style.display='none';
-    row.onclick = ()=>{
-      answers[q.id]='Other'; answers.QTIER=null;
-      otherInput.style.display='block';
-      [...document.querySelectorAll(`input[name="${q.id}"]`)].forEach(r=>r.closest('.opt').classList.remove('selected'));
-      row.classList.add('selected');
-      setNextEnabled(!!otherInput.value.trim());
-    };
-    otherInput.oninput = ()=>{ answers.Q3_other = otherInput.value; setNextEnabled(!!otherInput.value.trim()); };
-    wrap.appendChild(row); wrap.appendChild(otherInput);
-  }
   body.appendChild(wrap);
 }
 
@@ -700,30 +732,40 @@ function renderRatingGridScale5(q, body){
   };
 }
 
+// Real matrix table (brands as rows, statements as checkbox columns) per
+// client feedback — replaced the old accordion-per-brand layout, which they
+// found tedious to click through one brand at a time.
 function renderStmtGrid(q, body, rowLabels){
   if(!answers[q.id]) answers[q.id]={};
-  const wrap = document.createElement('div');
+  const wrap = document.createElement('div'); wrap.className='matrix-wrap';
+  const table = document.createElement('table'); table.className='matrix-table';
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.innerHTML = `<th class="row-label"></th>` + q.stmts.map(s=>`<th>${escapeHtml(s)}</th>`).join('');
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
   rowLabels.forEach(r=>{
     if(!answers[q.id][r]) answers[q.id][r]=[];
-    const acc = document.createElement('div'); acc.className='accordion';
-    acc.innerHTML = `<div class="acc-head">${escapeHtml(r)}<span class="tag">${answers[q.id][r].length} selected</span></div>
-                      <div class="acc-body"><div class="grid-row-options"></div></div>`;
-    const optsWrap = acc.querySelector('.grid-row-options');
+    const tr = document.createElement('tr');
+    const labelTd = document.createElement('td'); labelTd.className='row-label'; labelTd.textContent=r;
+    tr.appendChild(labelTd);
     q.stmts.forEach(s=>{
-      const chip = document.createElement('div'); chip.className='chip'; chip.textContent=s;
-      if(answers[q.id][r].includes(s)) chip.classList.add('selected');
-      chip.onclick=()=>{
+      const td = document.createElement('td'); td.className='cell-check';
+      const cb = document.createElement('input'); cb.type='checkbox';
+      cb.checked = answers[q.id][r].includes(s);
+      cb.onchange = ()=>{
         const arr = answers[q.id][r];
         const i = arr.indexOf(s);
-        if(i>-1) arr.splice(i,1); else arr.push(s);
-        chip.classList.toggle('selected');
-        acc.querySelector('.tag').textContent = arr.length+' selected';
+        if(cb.checked){ if(i===-1) arr.push(s); } else if(i>-1){ arr.splice(i,1); }
       };
-      optsWrap.appendChild(chip);
+      td.appendChild(cb);
+      tr.appendChild(td);
     });
-    acc.querySelector('.acc-head').onclick=()=>acc.querySelector('.acc-body').classList.toggle('open');
-    wrap.appendChild(acc);
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
   body.appendChild(wrap);
   setNextEnabled(true); // statement grids allow zero-selection rows (SOP: zero-response rows are valid)
 }
@@ -808,7 +850,6 @@ function flattenForExport(){
   const out = [
     {header:'ref', value:REF},
     {header:'source (ABM/Panel)', value:SRC},
-    {header:'QTIER', value: answers.QTIER || ''},
     {header:'disqualified', value: disqualified ? 'yes' : 'no'},
     {header:'disqualify_reason', value: disqualified || ''},
     {header:'start_time_ist', value: new Date(startTime).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})},
@@ -831,7 +872,7 @@ function flattenForExport(){
       out.push({header:`${q.code} - most valuable`, value: v.most});
     } else {
       out.push({header:`${q.code} - ${q.prompt}`, value: v});
-      if(q.id==='Q3' && answers.Q3_other) out.push({header:'Q3 - Other specify', value: answers.Q3_other});
+      if(answers[q.id+'_other']) out.push({header:`${q.code} - Other specify`, value: answers[q.id+'_other']});
     }
   });
   return out;
