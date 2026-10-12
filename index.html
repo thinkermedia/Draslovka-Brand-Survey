@@ -107,7 +107,7 @@ const AI_BRANDS_AWARE = [
 ];
 const AI_BRANDS_USAGE = ["Draslovka / MetOptima","Intellisense.io","Manta Controls","Metso Outotec","Seeq","Mintek","Orica","Trend Miner"];
 const AI_USAGE_STATEMENTS = ["We have purchased from them before","We currently use their products","I would recommend this brand","Had a poor experience"];
-const AI_BRANDS_ATTR = ["Draslovka/Met Optima","Intellisense.io","Manta Controls","Metso Outotec","Minetek","Orica","Seeq","Trend Miner"];
+const AI_BRANDS_ATTR = ["Draslovka/Met Optima","Intellisense.io","Manta Controls","Metso Outotec","Mintek","Orica","Seeq","Trend Miner"];
 const ATTR_STATEMENTS_6 = ["Innovative","Reliable","Trustworthy","Quality products","Customer centric","Well priced"];
 
 const ANALYZER_BRANDS = [
@@ -518,6 +518,13 @@ function renderQuestion(q){
   const body = document.getElementById('qbody');
   setNextEnabled(false);
 
+  // Default Next handler — set BEFORE the type dispatch so that a renderer
+  // needing custom Next behavior (e.g. renderRatingGridScale5's internal
+  // page-to-page pagination) can override it below and have that override
+  // actually stick, instead of being clobbered by this default afterward.
+  document.getElementById('nextBtn').onclick = handleNext;
+  document.getElementById('backBtn').onclick = goBack;
+
   if(q.type==='single') renderSingle(q, body);
   else if(q.type==='grouped_single') renderGroupedSingle(q, body);
   else if(q.type==='multi') renderMulti(q, body);
@@ -530,9 +537,6 @@ function renderQuestion(q){
   else if(q.type==='stmt_grid_dynamic_from_q19') renderStmtGridDynamic(q, body);
   else if(q.type==='content_pref') renderContentPref(q, body);
   else if(q.type==='open') renderOpen(q, body);
-
-  document.getElementById('nextBtn').onclick = handleNext;
-  document.getElementById('backBtn').onclick = goBack;
 }
 
 function renderSingle(q, body){
@@ -725,7 +729,6 @@ function renderRatingGridScale5(q, body){
   }
   checkPageComplete();
   // override Next to paginate within this question before moving on
-  const origNext = document.getElementById('nextBtn').onclick;
   document.getElementById('nextBtn').onclick = ()=>{
     if(q._page < chunks.length-1){ q._page++; renderQuestion(q); }
     else { q._page=0; handleNext(); }
